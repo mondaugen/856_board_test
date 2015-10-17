@@ -1,0 +1,4 @@
+# This is how to get sound in and out on sandman using the M-Audio Fast Track
+# Pro soundcard.
+arecord -D hw:CARD=Pro,DEV=1 -t raw -f S16_LE -c 2 -r 44100 -F 5000 | \
+    ./main.elf hw:CARD=Pro,DEV=0 hw:1,0,0

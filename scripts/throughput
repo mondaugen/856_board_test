@@ -1,0 +1,15 @@
+#!/bin/bash
+if [[ $# == 3 ]]
+then
+    ADEVIN=$1
+    ADEVOUT=$2
+    MDEV=$3
+else
+    ADEVIN=hw:CARD=Pro,DEV=1
+    ADEVOUT=hw:CARD=Pro,DEV=0
+    MDEV=hw:2,0,0
+fi
+# This is how to get sound in and out on sandman using the M-Audio Fast Track
+# Pro soundcard.
+arecord -D ${ADEVIN} -t raw -f S16_LE -c 2 -r 44100 -B 50000 -F 5000 | \
+    ./main.elf ${ADEVOUT} ${MDEV}

@@ -1,0 +1,7 @@
+#!/bin/bash
+if [[ $# -ne 1 ]]
+then
+echo "usage: $(basename $0) file-to-record-to"
+exit 65
+fi
+arecord -D plughw:CARD=Pro,DEV=1 -f s16_le -r 44100 -c 2 $1

@@ -1,0 +1,11 @@
+#!/bin/bash
+# Plays a sine wave on the right channel of the given AUDIODEV
+if [[ -z "$1" ]]
+then
+    SOUNDFILE=~/Music/bassline.wav
+else
+    SOUNDFILE=$1
+fi
+export AUDIODEV=plughw:CARD=Pro,DEV=0
+sox --combine merge "|sox -n -r 48000 -c 1 -p synth sine 1 gain -200"\
+    "|sox ${SOUNDFILE} -r 48000 -c 1 -p repeat 1000000" -d

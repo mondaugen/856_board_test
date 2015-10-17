@@ -1,0 +1,7 @@
+target remote localhost:3333
+monitor reset halt
+file ./main.elf
+load
+monitor reset halt
+# import the methods defined in arm-debug-utils
+source scripts/arm-debug-utils

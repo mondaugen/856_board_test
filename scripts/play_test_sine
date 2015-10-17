@@ -1,0 +1,11 @@
+#!/bin/bash
+# Plays a sine wave on the right channel of the given AUDIODEV
+export AUDIODEV=plughw:CARD=Pro,DEV=0
+if [[ -z "$1" ]]
+then
+    FREQUENCY=440
+else
+    FREQUENCY=$1
+fi
+sox --combine merge "|sox -n -c 1 -p synth sine 1 gain -200"\
+    "|sox -n -c 1 -p synth sine ${FREQUENCY}" -d

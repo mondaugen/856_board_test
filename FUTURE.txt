@@ -1,0 +1,7 @@
+Sample player could use envelope with delayed attack curve and offset position so that sample-accurate precision can be achieved.
+
+The scheduler offsets with sample-accurate timing should be controllable via some control change message / note on message so that the scheduler offset corresponds to a note (a frequency).
+
+The MIDI channel on which the device listens should be setable when the device boots up, perhaps by holding down some combination of switches.
+
+The scheduler should be syncable with MIDI sync messages.

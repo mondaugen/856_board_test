@@ -1,0 +1,14 @@
+When recording with overdub and 1 measure is made to equal recording time after recording, make volume of note 1 = 1 so that the amplitude doesn't drop.
+
+When recording for too long, what happens? The recording should end as if you toggled the recording switch.
+
+Does the frequency knob sometimes not work?
+
+Each note should have its own pool of allocated notes so that notes aren't ignored... (??). Maybe not...
+
+Some preset fields shouldn't be stored, for instance, the "mode" field.
+
+What is the initial preset when the device ships?
+
+Switch debouncing doesn't seem to work when toggling recording.
+    - LED1 lights up randomly for some reason because it is not recording anew even though the light is on.

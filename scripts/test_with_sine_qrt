@@ -1,0 +1,13 @@
+#!/bin/bash
+if [[ $# == 2 ]]
+then
+    ADEV=$1
+    MDEV=$2
+else
+    ADEV=hw:CARD=Pro,DEV=0
+    MDEV=hw:2,0,0
+fi
+echo "$AUDIODEV"
+# Send a sine at 440 hz to the program
+sox -n -t s16 -c 2 -r 44.1k - synth sine 440 gain -6| \
+    ./main.elf ${ADEV} ${MDEV}

@@ -1,0 +1,6 @@
+objs
+*.elf
+tags
+data
+tmp
+octave-workspace

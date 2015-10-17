@@ -1,0 +1,31 @@
+#!/bin/bash
+if [[ -z "$1" ]]
+then
+    echo "specify filename."
+    exit 65
+else
+    SOUNDFILE=$1
+fi
+if [[ -z "$2" ]]
+then
+    ADEV=hw:CARD=Pro,DEV=0
+else
+    ADEV=$2
+fi
+if [[ -z "$3" ]]
+then
+    MDEV=hw:2,0,0
+else
+    MDEV=$3
+fi
+echo "audio device: $AUDIODEV"
+echo "midi device: $AUDIODEV"
+if [[ -z "$4" ]]
+then
+    REPS=0
+else
+    REPS=$4
+fi
+# Send a sine at 440 hz to the program
+sox $SOUNDFILE -t s16 -c 2 -r 44.1k - repeat $REPS | \
+    ./main.elf ${ADEV} ${MDEV}
