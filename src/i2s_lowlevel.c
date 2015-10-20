@@ -5,6 +5,8 @@
 #include "audio_hw.h" 
 #include <string.h>
 
+#define WM8778_CODEC_ADDR  ((uint8_t)0x34)
+
 #ifdef CODEC_DMA_HARDFAULT_ON_I2S_ERR
 extern void HardFault_Handler(void);
 #endif
@@ -26,6 +28,9 @@ static int16_t * volatile codecDmaRxPtr
 static audio_hw_io_t audiohwio;
 /* The sample rate */
 static unsigned int rate = 0;
+
+static void codec_i2c_setup(void);
+static void codec_config_via_i2c(void);
 
 unsigned int audio_hw_get_sample_rate(void *data) {
     return rate;
@@ -308,6 +313,8 @@ audio_hw_err_t audio_hw_setup(audio_hw_setup_t *params)
     i2s_error_setup();
 
     /* Enable the DMA peripherals */
+    /* Set up I2C communication */
+    codec_i2c_setup();
    
     /* Audio should now be configured but is not yet enabled (must call
      * audio_hw_start). */
@@ -320,6 +327,7 @@ audio_hw_err_t audio_hw_start(audio_hw_setup_t *params)
     audiohwio.length = audio_hw_get_block_size(NULL);
     audiohwio.nchans_in = audio_hw_get_num_input_channels(NULL);
     audiohwio.nchans_out = audio_hw_get_num_output_channels(NULL);
+    codec_config_via_i2c();
 
     /* clear possible Interrupt flags */
     DMA1->HIFCR |= 0x00000f80;
@@ -464,14 +472,55 @@ void SPI3_IRQHandler (void)
 
 static void codec_prog_reg_i2c(uint8_t addr,uint8_t *data, uint32_t len)
 {
-    /* ... */
+    uint32_t tmp1, tmp2;
+    /* Enable acknowledge */
+//    I2C2->CR1 |= I2C_CR1_ACK;
+    /* Send start condition */
+    I2C2->CR1 |= I2C_CR1_START;
+    /* Wait for start bit to go high */
+    while (!((I2C2->SR1 & I2C_SR1_SB) && (I2C2->SR2 & I2C_SR2_MSL)));
+#ifdef     CODEC_I2C_PROG_START_TRIGGER
+        GPIOG->ODR |= 1 << 9;
+        GPIOG->ODR &= ~(1 << 9);
+#endif  
+    /* Send address */
+    I2C2->DR = addr;
+    do {
+        tmp1 = I2C2->SR1;
+    } while (!(tmp1 & I2C_SR1_ADDR));
+    tmp2 = I2C2->SR2;
+    while (len--) {
+        /* Wait for buffer to be empty */
+        while (!(I2C2->SR1 & I2C_SR1_TXE));
+        /* Write byte */
+        I2C2->DR = *data;
+        data++;
+    }
+    /* Wait for buffer to be empty */
+    while (!(I2C2->SR1 & I2C_SR1_TXE));
+    /* Send stop condition */
+    I2C2->CR1 |= I2C_CR1_STOP;
 }
 
 static void codec_i2c_setup(void)
 {
     /* Enable GPIOB, I2C2 clock */
     RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
+    /* Enable CE pin to set codec's address */
+    GPIOC->MODER &= ~(0x3 << (2 * 13));
+    /* Set to output */
+    GPIOC->MODER |= (0x1 << (2 * 13));
+    /* Set to Open/Drain */
+//    GPIOC->OTYPER |= (0x1 << 13);
+    /* High speed (?) */
+    GPIOC->OSPEEDR &= ~(0x3 << (2* 13));
+    GPIOC->OSPEEDR |= (0x2 << (2* 13));
+    /* Pull down */
+//    GPIOC->PUPDR &= ~(0x3 << (2 * 13));
+//    GPIOC->PUPDR |= (0x2 << (2 * 13));
+    /* Set low */
+    GPIOC->ODR &= ~(0x1 << 13);
     /* Enable I2C2 Pins, set to AF */
     /* PB10,PB11 */
     GPIOB->MODER &= ~((0x3 << (2* 10)) | (0x3 << (2*11)));
@@ -482,8 +531,25 @@ static void codec_i2c_setup(void)
     /* I2C Functions are alternate function 4 */
     GPIOB->AFR[1] &= ~((0xf << (4*2)) | (0xf << (4*3)));
     GPIOB->AFR[1] |= ((0x4 << (4*2)) | (0x4 << (4*3)));
-    /* Set equal to APB1 clock */
+    /* Pull-up */
+    GPIOB->PUPDR &= ~((0x3 << (2 * 10)) | (0x3 << (2 * 11)));
+    GPIOB->PUPDR |= ((0x2 << (2 * 10)) | (0x2 << (2 * 11)));
+    /* Set clock equal to APB1 clock */
     I2C2->CR2 &= ~(0x1f);
     I2C2->CR2 |= (uint32_t)45; /* 45Mhz */
+    /* Set up rise time based on clock and codec's I2C characteristics. */
+    I2C2->TRISE &= ~(0xf3);
+    I2C2->TRISE |= 0x46; /* See p. 853 STM32F429 reference manual. */
+    /* Set clock control register (see p. 852 ibid)*/
+    I2C2->CCR = (uint32_t)113; /* SCL is about 200KHz */
+    /* Enable peripheral */
+    I2C2->CR1 |= I2C_CR1_PE;
 }
 
+static void codec_config_via_i2c(void)
+{
+    /* Set ADC, DAC to I2S 16-bit */
+    uint8_t bytes[] = {0xa,0x2};
+    codec_prog_reg_i2c(WM8778_CODEC_ADDR,bytes,2);
+    /* That's it */
+}
