@@ -24,8 +24,15 @@ int audio_setup(void *data)
 void audio_hw_io(audio_hw_io_t *params)
 {
     int n;
+#if defined(CODEC_OUTPUT_CONSTANT)
+ #define CODEC_CONSTANT 0xaaaa 
+    for (n = 0; n < params->length; n++) {
+        params->out[n*params->nchans_out] = CODEC_CONSTANT;
+    }
+#else
     for (n = 0; n < params->length; n++) {
         params->out[n*params->nchans_out] =
             params->in[n*params->nchans_in];
     }
+#endif /* defined(CODEC_OUTPUT_CONSTANT) */
 }

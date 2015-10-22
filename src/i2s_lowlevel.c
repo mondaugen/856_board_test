@@ -470,34 +470,49 @@ void SPI3_IRQHandler (void)
     }
 }
 
-static void codec_prog_reg_i2c(uint8_t addr,uint8_t *data, uint32_t len)
+static int codec_i2c_check_flags(uint32_t flags)
 {
-    uint32_t tmp1, tmp2;
-    /* Enable acknowledge */
-//    I2C2->CR1 |= I2C_CR1_ACK;
+    uint32_t tmp;
+    tmp = (I2C2->SR1 << 16) | (I2C2->SR2);
+    if ((tmp & flags) == flags) {
+        return 1;
+    }
+    return 0;
+}
+
+static void codec_prog_reg_i2c(uint8_t addr,
+                               uint8_t reg_addr,
+                               uint16_t reg_val)
+{
+//    uint32_t tmp1, tmp2;
+#ifdef     CODEC_I2C_PROG_START_TRIGGER
+    GPIOG->ODR |= 1 << 9;
+    GPIOG->ODR &= ~(1 << 9);
+#endif  
+    /* Wait while busy */
+    while (codec_i2c_check_flags(0x2)); 
     /* Send start condition */
     I2C2->CR1 |= I2C_CR1_START;
-    /* Wait for start bit to go high */
-    while (!((I2C2->SR1 & I2C_SR1_SB) && (I2C2->SR2 & I2C_SR2_MSL)));
-#ifdef     CODEC_I2C_PROG_START_TRIGGER
-        GPIOG->ODR |= 1 << 9;
-        GPIOG->ODR &= ~(1 << 9);
-#endif  
+    /* Wait for master mode select */
+    while (!codec_i2c_check_flags(0x10003));
     /* Send address */
     I2C2->DR = addr;
-    do {
-        tmp1 = I2C2->SR1;
-    } while (!(tmp1 & I2C_SR1_ADDR));
-    tmp2 = I2C2->SR2;
-    while (len--) {
-        /* Wait for buffer to be empty */
-        while (!(I2C2->SR1 & I2C_SR1_TXE));
-        /* Write byte */
-        I2C2->DR = *data;
-        data++;
-    }
+    /* Wait for master mode selected. */
+    while (!codec_i2c_check_flags(0x00820007));
+    /* Send bytes */
+    uint8_t byte1, byte2;
+    byte1 = (reg_addr << 1) | ((reg_val >> 8) & (0x1));
+    byte2 = (uint8_t)(reg_val & 0xff);
+    /* Write byte */
+    I2C2->DR = byte1;
+    /* Wait for I2C to finish transmitting */
+    while (!codec_i2c_check_flags(0x00800007));
+    /* Write byte */
+    I2C2->DR = byte2;
+    /* Wait for I2C to finish transmitting */
+    while (!codec_i2c_check_flags(0x00800007));
     /* Wait for buffer to be empty */
-    while (!(I2C2->SR1 & I2C_SR1_TXE));
+    while (!codec_i2c_check_flags(0x00040000));
     /* Send stop condition */
     I2C2->CR1 |= I2C_CR1_STOP;
 }
@@ -534,6 +549,8 @@ static void codec_i2c_setup(void)
     /* Pull-up */
     GPIOB->PUPDR &= ~((0x3 << (2 * 10)) | (0x3 << (2 * 11)));
     GPIOB->PUPDR |= ((0x2 << (2 * 10)) | (0x2 << (2 * 11)));
+    /* Open / Drain */
+    GPIOB->OTYPER |= ((0x1 << 10) | (0x1 << 11));
     /* Set clock equal to APB1 clock */
     I2C2->CR2 &= ~(0x1f);
     I2C2->CR2 |= (uint32_t)45; /* 45Mhz */
@@ -542,6 +559,8 @@ static void codec_i2c_setup(void)
     I2C2->TRISE |= 0x46; /* See p. 853 STM32F429 reference manual. */
     /* Set clock control register (see p. 852 ibid)*/
     I2C2->CCR = (uint32_t)113; /* SCL is about 200KHz */
+    /* Enable acknowledge */
+//    I2C2->CR1 |= I2C_CR1_ACK;
     /* Enable peripheral */
     I2C2->CR1 |= I2C_CR1_PE;
 }
@@ -549,7 +568,10 @@ static void codec_i2c_setup(void)
 static void codec_config_via_i2c(void)
 {
     /* Set ADC, DAC to I2S 16-bit */
-    uint8_t bytes[] = {0xa,0x2};
-    codec_prog_reg_i2c(WM8778_CODEC_ADDR,bytes,2);
+//    uint8_t bytes[] = {0xa,0x2,0xb,0x2,0x5,0xff};
+    codec_prog_reg_i2c(WM8778_CODEC_ADDR,0x17,0x0000);
+    codec_prog_reg_i2c(WM8778_CODEC_ADDR,0xa,0x0002);
+    codec_prog_reg_i2c(WM8778_CODEC_ADDR,0xb,0x0002);
+    codec_prog_reg_i2c(WM8778_CODEC_ADDR,0x5,0x00ff);
     /* That's it */
 }
