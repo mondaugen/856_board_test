@@ -416,6 +416,8 @@ void DMA1_Stream7_IRQHandler(void)
 void SPI3_IRQHandler (void)
 {
     NVIC_ClearPendingIRQ(SPI3_IRQn);
+    /* Disable SPI interrupts */
+    NVIC_DisableIRQ(SPI3_IRQn);
     uint32_t spi3_sr = SPI3->SR, i2s3ext_sr = I2S3ext->SR;
     static volatile uint32_t num_i2s3ext = 0;
     if (spi3_sr & SPI_SR_OVR) {
@@ -459,15 +461,30 @@ void SPI3_IRQHandler (void)
 #endif
 #ifdef CODEC_DMA_TRIGGER_ON_I2S3_FRAME_ERR
         GPIOG->ODR |= 1 << 9;
-        GPIOG->ODR &= ~(1 << 9);
+//        GPIOG->ODR &= ~(1 << 9);
 #endif
         /* Disable I2S */
-//        I2S3ext->I2SCFGR &= ~SPI_I2SCFGR_I2SE;
-//        SPI3->I2SCFGR &= ~SPI_I2SCFGR_I2SE;
-        /* Enable I2S */
-//        I2S3ext->I2SCFGR |= SPI_I2SCFGR_I2SE;
-//        SPI3->I2SCFGR |= SPI_I2SCFGR_I2SE;
+        I2S3ext->I2SCFGR &= ~SPI_I2SCFGR_I2SE;
+        SPI3->I2SCFGR &= ~SPI_I2SCFGR_I2SE;
+        /* Wait until disabled */
+        while ((I2S3ext->I2SCFGR & SPI_I2SCFGR_I2SE) 
+                || (SPI3->I2SCFGR & SPI_I2SCFGR_I2SE));
+        /* Reconfigure codec */
+        codec_config_via_i2c();
+        /* Enable I2S master */
+        SPI3->I2SCFGR |= SPI_I2SCFGR_I2SE;
+        /* Wait until correct level is detected on WS line (high for I2S mode)
+         * for extended block which is running in slave mode */
+        while (!(GPIOA->IDR & (1 << 15)));
+        /* Enable I2S slave */
+        I2S3ext->I2SCFGR |= SPI_I2SCFGR_I2SE;
+#ifdef CODEC_DMA_TRIGGER_ON_I2S3_FRAME_ERR
+        GPIOG->ODR &= ~(1 << 9);
+//        GPIOG->ODR &= ~(1 << 9);
+#endif
     }
+    /* Enable SPI interrupts */
+    NVIC_EnableIRQ(SPI3_IRQn);
 }
 
 static int codec_i2c_check_flags(uint32_t flags)
@@ -568,10 +585,10 @@ static void codec_i2c_setup(void)
 static void codec_config_via_i2c(void)
 {
     /* Set ADC, DAC to I2S 16-bit */
-//    uint8_t bytes[] = {0xa,0x2,0xb,0x2,0x5,0xff};
     codec_prog_reg_i2c(WM8778_CODEC_ADDR,0x17,0x0000);
     codec_prog_reg_i2c(WM8778_CODEC_ADDR,0xa,0x0002);
-    codec_prog_reg_i2c(WM8778_CODEC_ADDR,0xb,0x0002);
+    codec_prog_reg_i2c(WM8778_CODEC_ADDR,0xb,0x0042);
     codec_prog_reg_i2c(WM8778_CODEC_ADDR,0x5,0x00ff);
+    /* invert MCLK */
     /* That's it */
 }
