@@ -32,6 +32,7 @@ typedef struct __switch_debouncer_t {
     uint32_t init_n_ignores;
     /* The number of request that are to be ignored from now on */
     uint32_t n_ignores;
+    uint32_t primed;
     void     *data;
 } switch_debouncer_t;
 

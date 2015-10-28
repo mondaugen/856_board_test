@@ -1,6 +1,13 @@
 #include <stddef.h> 
 #include "switches.h" 
 
+#ifdef SWITCH_CONTROL_DEBUG 
+#include "leds.h" 
+ #define switch_control_set_req_pin()       aux_led2_set()
+ #define switch_control_reset_req_pin()     aux_led2_reset()
+ #define switch_control_tog_req_pin()       aux_led2_tog()
+#endif  
+
 static uint32_t (*sw_get_state_funcs[]) (void) = {
     fsw1_get_state,
     fsw2_get_state,
@@ -150,6 +157,9 @@ void FSW1_IRQ_HANDLER (void)
     if (FSW1_EXTI->PR & (0x1 << FSW1_PORT_PIN)) {
         FSW1_EXTI->PR |= 0x1 << FSW1_PORT_PIN;
         fsw_toggle_states |= (0x1 << FSW1_TOG_PORT_PIN);
+#ifdef SWITCH_CONTROL_DEBUG 
+            switch_control_set_req_pin();
+#endif  
     }
 }
 

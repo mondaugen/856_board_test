@@ -14,6 +14,7 @@
 #include "synth_switch_control.h" 
 #include "adc_channel.h" 
 #include "synth_adc_control.h" 
+#include "switch_debounce_test.h" 
 
 #define INITIAL_COUNT 1000000L 
 
@@ -22,7 +23,11 @@ int main (void)
     if (audio_setup(NULL)) {
         THROW_ERR("Error setting up audio.");
     }
+    leds_setup();
+    switches_setup();
+    sdt_setup();
     audio_start();
     while(1) {
     }
+
 }

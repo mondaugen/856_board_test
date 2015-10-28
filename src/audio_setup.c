@@ -24,6 +24,8 @@ int audio_setup(void *data)
 void audio_hw_io(audio_hw_io_t *params)
 {
     int n;
+    /* Process switches. */
+    switch_control_do_all();
 #if defined(CODEC_OUTPUT_CONSTANT)
  #define CODEC_CONSTANT 0xaaaa 
     for (n = 0; n < params->length; n++) {

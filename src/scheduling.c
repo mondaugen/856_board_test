@@ -7,6 +7,10 @@
 #include "mm_common_calcs.h" 
 #include <math.h> 
 
+#ifdef DEBUG
+ #include <assert.h>
+#endif  
+
 /* The scheduler is set up so that the 32 LSB of the time are fractional part 
  * and the 32 MSB are the integer part of a beat index. So that this works, the
  * scheduler time is incremented 0xffffffff*tempoBPM beats per minute and events

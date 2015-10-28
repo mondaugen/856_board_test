@@ -1,6 +1,23 @@
 #include "switch_control.h" 
 #include <stddef.h> 
+
 /* Functions for looking at a GPIO port and calling functions on the value */
+#ifdef SWITCH_CONTROL_DEBUG
+
+ #include "leds.h" 
+
+ #define switch_control_set_req_pin()       aux_led2_set()
+ #define switch_control_reset_req_pin()     aux_led2_reset()
+ #define switch_control_tog_req_pin()       aux_led2_tog()
+
+ #define switch_control_set_check_pin()     aux_led3_set()
+ #define switch_control_reset_check_pin()   aux_led3_reset()
+ #define switch_control_tog_check_pin()     aux_led3_tog()
+
+ #define switch_control_set_prime_pin()     aux_led1_set()
+ #define switch_control_reset_prime_pin()   aux_led1_reset()
+ #define switch_control_tog_prime_pin()     aux_led1_tog()
+#endif /* SWITCH_CONTROL_DEBUG */ 
 
 static switch_control_t * _switch_controls = NULL;
 
@@ -33,23 +50,49 @@ void switch_control_init(switch_control_t *sc,
     sc->next = NULL;
 }
 
+/* Called when checking pin state (canonically called by switch_control_do_all
+ * when switch states are to be checked, usually in some periodic checking
+ * function, like the callback that is called when the codec requests samples,
+ * for instance).
+ */
 static void switch_control_debounce_func(switch_control_t *sc)
 {
     switch_debouncer_t *sd = (switch_debouncer_t*)sc->data;
-    if (sd->get_req_state(sd)) {
-        if (sd->n_ignores) {
-            /* Did this request come too soon after a previous acknowledge? If
-             * so, the request is bogus. */
-            sd->reset_req_state(sd);
-        } else if (sd->get_pin_state(sd) == 0) {
+#ifdef SWITCH_CONTROL_DEBUG 
+    switch_control_set_check_pin();
+    switch_control_reset_check_pin();
+#endif  
+    if (sd->primed) {
+        if (sd->get_pin_state(sd) == 0) {
             /* The pin is low. */
             /* Pin has been brought to its rest (reset) position again */
+            /* call function */
             sd->func(sd);
+            /* reset primed */
+            sd->primed = 0;
+#ifdef SWITCH_CONTROL_DEBUG 
+            switch_control_reset_prime_pin();
+#endif  
+            /* start ignore period by setting number of ignores */
             sd->n_ignores = sd->init_n_ignores;
-            sd->reset_req_state(sd);
-        } 
-        /* Otherwise we are still waiting for the pin to go low. */
+        }
+        /* otherwise we're still waiting for the pin to go low */
+    } else {
+        /* if the ignore period is over and request was made*/
+        if ((sd->n_ignores == 0) && (sd->get_req_state(sd))) {
+            /* prime */
+            sd->primed = 1;
+#ifdef SWITCH_CONTROL_DEBUG 
+            switch_control_set_prime_pin();
+#endif  
+        }
     }
+    /* reset request in any case*/
+    sd->reset_req_state(sd);
+#ifdef SWITCH_CONTROL_DEBUG 
+    switch_control_reset_req_pin();
+#endif  
+    /* decrement ignores */
     if (sd->n_ignores) {
         sd->n_ignores--;
     }
@@ -85,6 +128,7 @@ void switch_debouncer_init(switch_debouncer_t *sd,
         sd->func = func;
         sd->init_n_ignores = init_n_ignores;
         sd->n_ignores = 0;
+        sd->primed = 0;
         sd->data = (void*)state;
 }
 
