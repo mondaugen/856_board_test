@@ -22,7 +22,7 @@ static void sdt_test_FSW1_tog_setup(void)\
     static switch_control_t control;
     switch_debouncer_init(&debouncer,
             sdt_FSW1_tog_func,
-            1,
+            2,
             &mom_state);
     switch_control_debounce_init(&control,&debouncer);
     switch_control_add(&control);

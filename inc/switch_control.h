@@ -28,7 +28,9 @@ typedef struct __switch_debouncer_t {
     void     (*reset_req_state)(struct __switch_debouncer_t *);
     /* What to do when a request has been verified and acknowledged */
     void     (*func)(struct __switch_debouncer_t *);
-    /* The number of ignores that are specified after an acknowledged request */
+    /* The number of ignores that are specified after an acknowledged request.
+     * This number should be seen as the number of "checks" (by
+     * switch_control_do_all, say) that go by before a request is acknowledged. This includes the "check" when the number of ignores is set, so if you set number of ignores to 1, it will immediately be decremented, and therefore no check will be ignored. So this number should be one more than the number of checks you want to ignore. */
     uint32_t init_n_ignores;
     /* The number of request that are to be ignored from now on */
     uint32_t n_ignores;
