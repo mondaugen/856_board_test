@@ -6,6 +6,7 @@
 #include <string.h>
 
 #define WM8778_CODEC_ADDR  ((uint8_t)0x34)
+#define CODEC_I2C_TIMEOUT       ((uint32_t)1000000) 
 
 #ifdef CODEC_DMA_HARDFAULT_ON_I2S_ERR
 extern void HardFault_Handler(void);
@@ -497,6 +498,13 @@ static int codec_i2c_check_flags(uint32_t flags)
     return 0;
 }
 
+static void codec_i2c_swrst(void)
+{
+    I2C2->CR1 |= I2C_CR1_SWRST;
+    while (codec_i2c_check_flags(0x00c00000));
+    I2C2->CR1 &= ~I2C_CR1_SWRST;
+}
+
 static void codec_prog_reg_i2c(uint8_t addr,
                                uint8_t reg_addr,
                                uint16_t reg_val)
@@ -506,16 +514,29 @@ static void codec_prog_reg_i2c(uint8_t addr,
     GPIOG->ODR |= 1 << 9;
     GPIOG->ODR &= ~(1 << 9);
 #endif  
+    uint32_t timeout;
     /* Wait while busy */
-    while (codec_i2c_check_flags(0x2)); 
+    timeout = CODEC_I2C_TIMEOUT;
+    while (codec_i2c_check_flags(0x2) && --timeout);
+    if (timeout == 0) {
+        codec_i2c_swrst();
+    }
     /* Send start condition */
     I2C2->CR1 |= I2C_CR1_START;
     /* Wait for master mode select */
-    while (!codec_i2c_check_flags(0x10003));
+    timeout = CODEC_I2C_TIMEOUT;
+    while ((!codec_i2c_check_flags(0x10003)) && --timeout);
+    if (timeout == 0) {
+        codec_i2c_swrst();
+    }
     /* Send address */
     I2C2->DR = addr;
     /* Wait for master mode selected. */
-    while (!codec_i2c_check_flags(0x00820007));
+    timeout = CODEC_I2C_TIMEOUT;
+    while ((!codec_i2c_check_flags(0x00820007)) && --timeout);
+    if (timeout == 0) {
+        codec_i2c_swrst();
+    }
     /* Send bytes */
     uint8_t byte1, byte2;
     byte1 = (reg_addr << 1) | ((reg_val >> 8) & (0x1));
@@ -523,13 +544,25 @@ static void codec_prog_reg_i2c(uint8_t addr,
     /* Write byte */
     I2C2->DR = byte1;
     /* Wait for I2C to finish transmitting */
-    while (!codec_i2c_check_flags(0x00800007));
+    timeout = CODEC_I2C_TIMEOUT;
+    while ((!codec_i2c_check_flags(0x00800007)) && --timeout);
+    if (timeout == 0) {
+        codec_i2c_swrst();
+    }
     /* Write byte */
     I2C2->DR = byte2;
     /* Wait for I2C to finish transmitting */
-    while (!codec_i2c_check_flags(0x00800007));
+    timeout = CODEC_I2C_TIMEOUT;
+    while ((!codec_i2c_check_flags(0x00800007)) && --timeout);
+    if (timeout == 0) {
+        codec_i2c_swrst();
+    }
     /* Wait for buffer to be empty */
-    while (!codec_i2c_check_flags(0x00040000));
+    timeout = CODEC_I2C_TIMEOUT;
+    while ((!codec_i2c_check_flags(0x00040000)) && --timeout);
+    if (timeout == 0) {
+        codec_i2c_swrst();
+    }
     /* Send stop condition */
     I2C2->CR1 |= I2C_CR1_STOP;
 }
@@ -573,9 +606,10 @@ static void codec_i2c_setup(void)
     I2C2->CR2 |= (uint32_t)45; /* 45Mhz */
     /* Set up rise time based on clock and codec's I2C characteristics. */
     I2C2->TRISE &= ~(0xf3);
-    I2C2->TRISE |= 0x46; /* See p. 853 STM32F429 reference manual. */
+    /* no more than 14 clocks fit into the minimum rise time */
+    I2C2->TRISE |= (uint32_t)14; /* See p. 853 STM32F429 reference manual. */
     /* Set clock control register (see p. 852 ibid)*/
-    I2C2->CCR = (uint32_t)113; /* SCL is about 200KHz */
+    I2C2->CCR = (uint32_t)452; /* SCL is about 50Khz */
     /* Enable acknowledge */
 //    I2C2->CR1 |= I2C_CR1_ACK;
     /* Enable peripheral */
