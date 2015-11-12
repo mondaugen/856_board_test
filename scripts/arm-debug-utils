@@ -26,3 +26,7 @@ define armv7_time_loop
     printf "Number of cycles: %d\n", (*(0xe0001004))
 end
 
+define load_reset
+    load
+    monitor reset halt
+end
